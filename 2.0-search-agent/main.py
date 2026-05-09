@@ -9,6 +9,8 @@ load_dotenv()
 
 
 # Defining a tool
+# Note: This is just to showcase how to write a custom function (including the docstring)
+# However, the optimal practice should be just using the SDK's built-in search tool.
 @tool
 def search(query: str):
     """Tool that seraches over internet
