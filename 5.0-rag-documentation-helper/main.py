@@ -4,6 +4,9 @@ from backend.core import chat_with_llm
 
 import streamlit as st
 
+# set page config (browser tab)
+st.set_page_config(page_title="NextJS Doc Helper")
+
 # Title and sidebar
 st.title("NextJS Documentation Helper")
 with st.sidebar:
