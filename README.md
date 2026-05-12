@@ -29,6 +29,10 @@
     * RAG + ReAct Loop (RAG as a tool at the agent's disposal and use when it thinks needed)
     * Frontend Chat Interface using Streamlit
 
+* 6.0-LangGraph-ReAct
+    * Build a ReAct Loop using LangGraph
+
+---
 
 ## Retrieval-Augmented Generation (RAG) with LangChain Express Language (LCEL)
 
@@ -96,6 +100,7 @@ context=RunnableLambda(lambda x: x["question"])
 * Reusable Chain
 * Better Debugging with LangSmith (all operations are stored under one chain)
 
+---
 
 ## Scraping Data using Tavily Crawl (or Tavily Map + Tavily Extract)
 
@@ -174,3 +179,124 @@ for message in response["messages"]:
             sources.append(artifact.metadata.get("source", "unknown"))
 ```
 * After receiving a response from the LLM agent, we can loop through all the messages and target the Tool Message and gather all the artifacts to store them.
+
+
+---
+
+## Introduction to LangGraph
+
+### Useful Sources
+* High Level Concept: https://docs.langchain.com/oss/python/langgraph/graph-api
+* Useful Implementation Code: https://docs.langchain.com/oss/python/langgraph/use-graph-api
+
+### Brief Summary of Important Concepts
+* Creating a graph in LangGraph consists of the following core components
+    1. State - Useful variables that all nodes in the graph can refer to
+    2. Node - Can be thought of a component that actually do works, such as a Reasoning Engine or an Acting Node
+    3. Edge - Deciding the next step, can be statically defined or dynamically defined using a function
+
+### Learn through code snippets
+Source: 6.0-langgraph-react
+
+1. Defining State for a graph
+```python
+class OverallState(MessagesState):
+    extra_field: str
+```
+* `MessagesState` inherit from `TypedDict`. By default it has an attribute - messages that is typed as following: `Annotated[list[AnyMessage], add_messages]`
+* where `add_messages` is particularly useful, when whenever a node return `{messages: [AIMessage(...) or UserMessage(...)]}`, it will automatically be appended.
+* Otherwise, usually without add_messages, a state returned by a node will just replace whatever is currently in the overall state.
+* It is important to note a syntax here that the returned messages must be a `list`.
+* Read More about `MessagesState`: https://reference.langchain.com/python/langgraph/graph/message/MessagesState
+
+
+2. Creating the reasoning node
+```python
+base_model = init_chat_model(model="openai:gpt-5.4-mini", temperature=0)
+model_with_tools = base_model.bind_tools(tools)
+```
+* Pass the available tools to the model
+* Since it is only a model and not an agent, it does not have the capabilities of executing ReAct Loop
+* A certain graph flow will be implemented subsequently in the code to check the model tries to call a tool
+* Which will direct the flow the graph nodes that will execute tool
+
+```python
+def reasoning_node(state: OverallState):
+    conversation = [SystemMessage(content=system_prompt), *state["messages"]]
+    result = model_with_tools.invoke(conversation)
+    return {"messages": [result]}
+```
+* The actual reasoning node
+* It always unpack the messages that are stored in the state along with the system prompt
+* The responses are appended to the messages field inherited from MessagesState
+* Usually this will overwrite the messages attribute, but because of MessagesState having the add_messages operator
+* So long that the returned value of "messages" is a `list` of `AIMessage(...) or equivalent`, it will be added to the state
+
+
+3. Creating the acting nodes
+```python
+acting_node = ToolNode(tools)
+```
+* This is a prebuilt node provided by the LangGraph
+* Refer to: https://reference.langchain.com/python/langgraph.prebuilt/tool_node/ToolNode
+* It automatically check the graph state and see if the last entry of "messages" has a tool call
+* It then call, execute the call and return the response in a ToolMessage
+
+4. Defining conditional edge
+```python
+def should_continue(state: OverallState):
+    if state["messages"][-1].tool_calls:
+        return "acting_node"
+    else:
+        return "end"
+```
+* Conditional Edge decides whether to continue taking actions or returning an answer
+* Check the state - whether last message contains a tool call
+* If so redirecting it to the acting_node
+* Else redirecting it to END
+* Useful references: https://docs.langchain.com/oss/python/langgraph/use-graph-api#conditional-branching
+
+5. Creating a builder
+```python
+builder = StateGraph(OverallState)
+```
+* As seen when defining the builder,
+* the `OverallState` is passed in as the type that governs the type of state in the graph
+
+6. Declaring nodes in the graph
+```python
+builder.add_node("reasoning_node", reasoning_node)
+builder.add_node("acting_node", acting_node)
+```
+* `.add_node` usually will just take the name of the function as the node name for reference in the graph building
+* However, for prebuilt node like `ToolNode`, this doesnt work
+* Therefore for **standardification**, I have assigned name for both of them
+
+7. Declaring edges in the graph
+```python
+builder.add_edge(START, "reasoning_node")
+builder.add_conditional_edges(
+    "reasoning_node",
+    should_continue,
+    {"acting_node": "acting_node", "end": END},
+)
+builder.add_edge("acting_node", "reasoning_node")
+```
+* In particular, for the conditional edges, usually, the 3rd argument is not needed
+* The 3rd argument basically maps the output of directing function to the name of the node
+* But through trial error, it is found that it is needed to plot the graph nicely
+
+8. Compile the builder into a runnable interface / graph
+```python
+graph = builder.compile()
+```
+
+9. Utilize the graph as an ReAct Agent
+```python
+print("Hello from 6-0-langgraph-react!")
+user_input = (
+    "What is the temperature in Kuala Lumpur now? List it and multiply by 3."
+)
+result = graph.invoke({"messages": user_input})
+print(result["messages"][-1].content)
+```
