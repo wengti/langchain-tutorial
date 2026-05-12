@@ -300,3 +300,55 @@ user_input = (
 result = graph.invoke({"messages": user_input})
 print(result["messages"][-1].content)
 ```
+
+---
+
+## Reflection Agent
+* source code: 7.0-reflection-agent
+* Description: An agent that consists of 2 chain where 1 is responsible to generate tweet while the other one is in charge of providing feedback to improve it.
+
+### Overall Graph
+![The graph of the reflection agent's workflow](7.0-reflection-agent/graph.png)
+
+
+### Interesting Code Snippet
+1. A key concept implemented here:
+* Create a chain first
+* Convert each of the chain as a node
+* Inside the node, the chain is invoked and returning a certain state.
+
+2. `MessagePlaceholder` and `ChatPromptTemplate`
+```python
+# Generation Chain
+with open("generation_prompt.txt") as f:
+    generation_prompt = f.read()
+generation_prompt_template = ChatPromptTemplate(
+    [
+        SystemMessage(content=generation_prompt),
+        MessagesPlaceholder("messages"),
+    ]
+)
+generation_chain = generation_prompt_template | llm_model
+```
+* Making of `MessagePlaceholder` in the `ChatPromptTemplate`
+* The resulting template is therefore expected to be invoked using a dictionary of `{"messages": [AIMessage(), HumanMessage()...]}`
+
+3. A trick used in creating the reflection feedback - treat AI feedback as HumanMessage instead of AIMessage
+```python
+def reflection_node(state: OverallState):
+    response = reflection_chain.invoke({"messages": state["messages"]})
+    return {"messages": [HumanMessage(content=response.content)]}
+```
+
+4. Deciding how to end with a simple heuristics
+```python
+# Conditional Edge
+def should_continue(state: OverallState):
+    if len(state["messages"]) > 6:
+        return "end"
+    return "reflection_node"
+```
+* Ideally, a better implementation is to have another chain that decides for each generation whether it should be sent to reflection or sent to END node.
+
+
+
