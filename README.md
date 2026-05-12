@@ -21,6 +21,7 @@
     * Pinecone as vector database
 
 * 5.0-RAG-Documentation-Helper
+    * Deployment: https://rag-nextjs-assistant.streamlit.app/
     * RAG using information scraped from Internet using Tavily
     * A list of hyperparameter and its value for data scraping and storage
     * Using `asyncio` to perform tasks in parallel in scraping and storing data

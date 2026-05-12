@@ -1,0 +1,13 @@
+[project]
+name = "6-0-langgraph-react"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.14"
+dependencies = [
+    "langchain>=1.2.18",
+    "langchain-openai>=1.2.1",
+    "langchain-tavily>=0.2.18",
+    "langgraph>=1.1.10",
+    "python-dotenv>=1.2.2",
+]
