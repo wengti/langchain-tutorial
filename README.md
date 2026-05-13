@@ -414,6 +414,16 @@ first_responder_prompt = general_template.partial(
 )
 ```
 * Curate the prompt template by passing in only some of the needed information.
+
+3. Creating a model that always use a tool
+```python
+llm_with_tools = basic_llm.bind_tools(
+    tools_list,
+    tool_choice="search_tool",
+)
+```
+* Making use of the `tool_choice` parameter, it will always call the corresponding tool.
+* Which results in an `AIMessage` that does not have `content=''` but with `tool_call` in it
     
 
 
