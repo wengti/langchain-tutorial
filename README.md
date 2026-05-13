@@ -32,6 +32,11 @@
 * 6.0-LangGraph-ReAct
     * Build a ReAct Loop using LangGraph
 
+* 7.0-Reflection-Agent
+    * An architecture consisting of 2 chains which are responsible for generating and giving feedbacks respectively for improvement.
+
+* 8.0-Reflextion-Agent
+    * An architecture that is built upon Reflection Agent except that this agent has capabilities to give feedbacks based on online information.
 ---
 
 ## Retrieval-Augmented Generation (RAG) with LangChain Express Language (LCEL)
@@ -349,6 +354,67 @@ def should_continue(state: OverallState):
     return "reflection_node"
 ```
 * Ideally, a better implementation is to have another chain that decides for each generation whether it should be sent to reflection or sent to END node.
+
+
+## Reflexion Agent
+* source: 8.0-reflextion-agent
+
+### Overview of a Reflexion Agent
+![The architecture of a reflexion agent](8.0-reflextion-agent/graph.png)
+* The very essence of a Reflexion Agent is such that it consists of a flow that does the following:
+    1. Generate a response
+    2. Reflecting on the response (Pointing out what is missing in the response and what is unnecessary in the response)
+    3. Recommending the search term to get information for improvement
+    4. Calling a search tool to search information based on the search terms
+* It essentially keeps repeating this loop until a certain stop condition is reached.
+* For actual implementation, this flow is broken down into a few nodes:
+    1. `First Responder Node`:
+        * Generate an initial response (purely based on user queries)
+        * Reflecting
+        * Recommending search terms
+    2. `First Responder Tool Call Node`:
+        * **ALWAYS** call the search tool to collect information
+    3. `Revisor Node`:
+        * Generate an improved response (based on the search results)
+        * Reflecting
+        * Recommending search terms
+    4. `Revisor Tool Call Node`:
+        * **ALWAYS** call the search tool to collect information
+        * Actually now that I look at it, this can be merged with First Responder Tool Call Node.
+* It is also worth pointing out that First Responder Node and Revisor Node are similar in term of their functionalities, but is implemented as 2 different nodes because the former generate without online searched information while the latter does, resulting in a different system prompt.
+
+### Interesting Code Snippet
+
+1. Passing variables into `PromptTemplate` - use `tuple` instead of `SystemMessage`
+
+```python
+generation_system_message = """
+You are a helpful research assistant that follows the following instructions:
+
+1. {chain_instruction}
+2. Reflect on your answers by listing out what is missing and what is superfluous in the generated answer. This will be the directions for future iterations to improve on its quality.
+3. After reflection, Suggest 1 to 3 query terms that can be helpful for searching relevant information on the web to help improving the generated answer in the future iterations.
+4. The word limitation is only applicable to the actual answer itself. You may generate as much reflection, seach queries and references without being limited by the word limitation.
+
+
+"""
+general_template = ChatPromptTemplate(
+    [
+        ("system", generation_system_message),
+        MessagesPlaceholder(variable_name="messages"),
+    ]
+)
+```
+* Use `("system", generation_system_message)` instead of `SystemMessage(content=generation_system_message)` if you have a `{}` variable to be parsed.
+
+2. `.partial()`
+```python
+first_responder_prompt = general_template.partial(
+    chain_instruction=first_responder_chain_instruction,
+)
+```
+* Curate the prompt template by passing in only some of the needed information.
+    
 
 
 
