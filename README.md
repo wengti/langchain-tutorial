@@ -424,7 +424,48 @@ llm_with_tools = basic_llm.bind_tools(
 ```
 * Making use of the `tool_choice` parameter, it will always call the corresponding tool.
 * Which results in an `AIMessage` that does not have `content=''` but with `tool_call` in it
-    
+
+---
+
+## Agentic RAG
+
+### Overview
+The implemented Agentic RAG architecture in this section is composed of 3 parts that are implemented progressively, one on top of the other:
+    * Corrective RAG - enable doing web search if deemed RAG is not enough
+    * Self RAG - reflect on its own answer to check hallucination and usefulness
+    * Adaptive RAG - decide if the user query are relevant to data in vector database. If not, can directly start with a web search instead.
+
+### Corrective RAG (CRAG)
+![Corrective RAG](9.0-agentic-rag/graph_crag.png)
+* Retriever Grader Node is essentially a LLM that has a structured output of True or False, deciding if each retrieved document from RAG that is relevant to user query.
+* Irrelevant document will be also removed from being the context for the final answer generation.
+* For a simple heuristic, if any of the retrieved documents, the flow is directed to web search.
+* They all convene to another node that will takes the context to generate an answer.
+
+### Self RAG 
+![Self RAG](9.0-agentic-rag/graph_self-crag.png)
+* Hallucination Grader
+    * Compare the answer with the obtained context
+    * Have a structured output of True or False whether the generated answer shows a sign of hallucination.
+    * If hallucination is identified, it is redirected to regenerate.
+    * To avoid being in infinite loop, the following measure is taken:
+        * Once hallucination is detected, a stricter prompt is imposed onto the generation node.
+        * The check of hallucination is only done for 2 times. After that, it just directs to the next node.
+
+* Usefulness Grader
+    * A node that checks if the answer is useful for the user query.
+    * Have a structured output of True or False whether the generated answer is useful.
+    * If it is deemed not useful, it will go back to web search.
+    * Similarly, to prevent infinite loop:
+        * The search scope is expanded from 5 results to 10 results
+        * The check of usefulness is only done for 2 times. After that, it just directs to the next node.
+
+### Adaptive RAG
+![Adaptive RAG](9.0-agentic-rag/graph_adaptive-rag.png)
+* Added a Router Node that decides whether to start the flow with RAG or directly with a web search based on user query.
+* It features a LLM that has structured output of 0 (start with RAG) or 1 (start with Web Search)
+
+
 
 
 
