@@ -18,4 +18,4 @@ def retriever_node(state: OverallState):
     print("=== RETRIEVER NODE ===")
     user_query = state.user_query
     retrived_documents = retriever.invoke(user_query)
-    return {"documents": retrived_documents}
+    return {"retrieved_documents": retrived_documents}

@@ -9,7 +9,19 @@ load_dotenv()
 def generator_node(state: OverallState):
     print("=== GENERATOR NODE ===")
     user_query = state.user_query
-    documents = state.documents
+    retrieved_documents = state.retrieved_documents
+    searched_documents = state.searched_documents
+    documents = []
+    documents.extend(retrieved_documents)
+    documents.extend(searched_documents)
+
+    is_hallucinating = state.is_hallucinating
+    if is_hallucinating:
+        user_query += (
+            "\nYou have tried to generate content that is not based on the provided context before."
+            "Make sure you do not do this in this attempt. Generate solely based on the provided context."
+        )
+
     context = "\n\n".join(
         [
             f"Sources: {document.metadata["source"]}\nContent: {document.page_content}"

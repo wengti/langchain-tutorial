@@ -10,11 +10,11 @@ from chains.retrieval_grader import (
 def retrieval_grader_node(state: OverallState):
     print("=== RETRIEVAL GRADER NODE ===")
     user_query = state.user_query
-    documents = state.documents
+    retrieved_documents = state.retrieved_documents
     filtered_documents = []
     should_web_search = False
 
-    for document in documents:
+    for document in retrieved_documents:
         response: RetrievalGraderResponseFormat = retrieval_grader_chain.invoke(
             {"user_query": user_query, "document_txt": document.page_content}
         )
@@ -23,4 +23,7 @@ def retrieval_grader_node(state: OverallState):
         else:
             should_web_search = True
 
-    return {"documents": filtered_documents, "should_web_search": should_web_search}
+    return {
+        "retrieved_documents": filtered_documents,
+        "should_web_search": should_web_search,
+    }
